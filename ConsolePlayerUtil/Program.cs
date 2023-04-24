@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Drawing.Imaging;
 using System.Reflection;
 using System.Media;
+using System.Text;
 
 namespace ConsolePlayerUtil
 {
@@ -26,7 +27,6 @@ namespace ConsolePlayerUtil
         static void Main(string[] args)
         {
             HandleInput();
-            audio.SoundLocation = "D:\\Bordel\\Rust screen cringe\\badapple\\bad apple - orig.wav";
             Console.Write("Loading files");
             selectedFiles = new DirectoryInfo(selectedDirectory).GetFiles("*." + selectedExtension.ToString());
             int writeInterval = selectedFiles.Length / 10;
@@ -50,11 +50,17 @@ namespace ConsolePlayerUtil
             Console.Clear();
             Console.Write("Commencing playback");
             Thread.Sleep(500);
-            PlayBitmaps(SelectedBitmaps,selectedFormat,30,30,0);
+            if (audio.SoundLocation != "")
+            {
+                PlayBitmaps(SelectedBitmaps, 25, 25, audio);
+            }
+            else
+                PlayBitmaps(SelectedBitmaps, 25, 25);
             Console.ReadLine();
         }
         static bool HandleInput()  //Returns true if all input is valid, otherwise returns false
         {
+            audio.SoundLocation = "";
             selectedDirectory = "";
             PlayableDirectories = new List<string>();
             Console.Write("Welcome to Console Player Util\nYou can use arrows for menu orientation and Enter to confirm.\nPress Enter to start");
@@ -92,12 +98,19 @@ namespace ConsolePlayerUtil
                     Console.Clear();
                     Console.Write("Input desired folder path: ");
                     string path = Console.ReadLine();
+                    string upperDir;
                     if (Directory.Exists(path))
                     {
+                        upperDir = path.Split('/')[path.Split('/').Length-1] + "/";
                         DirectoryInfo[] di = new DirectoryInfo(path).GetDirectories("*.*", SearchOption.AllDirectories);
+                        FileInfo[] currDirFiles = new DirectoryInfo(path).GetFiles("*" + selectedExtension.ToString());
+                        if(currDirFiles.Length > 0)
+                        {
+                            PlayableDirectories.Add(new DirectoryInfo(path).FullName.Replace(path, ""));
+                        }
                         foreach (DirectoryInfo d in di)
                         {
-                            FileInfo[] currDirFiles = d.GetFiles("*" + selectedExtension.ToString());
+                            currDirFiles = d.GetFiles("*" + selectedExtension.ToString());
                             if (currDirFiles.Length > 0)
                             {
                                 PlayableDirectories.Add(d.FullName.Replace(path,""));
@@ -120,12 +133,46 @@ namespace ConsolePlayerUtil
                     }
                 }
             }
+            bool useAudio;
+            string audioPath = "";
+            while (true)
+            {
+                Console.Clear();
+                useAudio = ChoiceYesNo("Use audio file?");
+                if (useAudio)
+                {
+                    Console.Clear();
+                    Console.Write("Input desired audio file path (.wav): ");
+                    audioPath = Console.ReadLine();
+                    if (File.Exists(audioPath))
+                    {
+                        if(Path.GetExtension(audioPath) != ".wav")
+                        {
+                            Console.WriteLine("Input file is not a .wav file.");
+                            Thread.Sleep(1000);
+                            continue;
+                        }
+                        break;
+                    }
+                    else
+                    {
+                        Console.WriteLine("Input file was not found.");
+                        Thread.Sleep(1000);
+                        continue;
+                    }
+                }
+                break;
+            }
+            Console.Clear();
+            audio.SoundLocation = audioPath;
             return true;
         }
-        static void PlayBitmaps(List<Bitmap> inputBitmaps, ImageFormat imageFormat, int originalFPS, int targetFPS, int skippedFrames)
+        static void PlayBitmaps(List<Bitmap> inputBitmaps, int originalFPS, int targetFPS, SoundPlayer videoAudio = null)
         {
             Console.Clear();
+            int skippedFrames = originalFPS / targetFPS;
             Bitmap currFrame;
+            StringBuilder frameBuilder = new StringBuilder();
             int frameTime = 1000 / targetFPS;
             float frameTimeRemainder = (1000f / (float)targetFPS) - frameTime;
             int leapFrameIndex = 0;
@@ -139,7 +186,8 @@ namespace ConsolePlayerUtil
                 }
             }
             DateTime nextFrameTime = DateTime.Now.AddMilliseconds(1000 / targetFPS);
-            audio.Play();
+            if(videoAudio != null)
+                videoAudio.Play();
             for (int i = 0; i < inputBitmaps.Count; i++)
             {
                 leapMs = 0;
@@ -154,7 +202,8 @@ namespace ConsolePlayerUtil
                 currFrame = inputBitmaps[i];
                 for (int x = 0; x < inputBitmaps[0].Height * 2; x++)
                 {
-                    FastConsole.WriteLine("");
+                    frameBuilder.AppendLine("");
+                    //FastConsole.WriteLine("");
                 }
                 char c;
                 Color currPixel;
@@ -167,16 +216,20 @@ namespace ConsolePlayerUtil
                             c = ' ';
                         else
                             c = CharacterGrayScale(currPixel.R);
-                        FastConsole.Write(c.ToString() + " ");
+                        frameBuilder.Append(c + " ");
+                        //FastConsole.Write(c.ToString() + " ");
                     }
-                    FastConsole.WriteLine("");
+                    frameBuilder.Append('\n');
+                    //FastConsole.WriteLine("");
                 }
+                FastConsole.Write(frameBuilder.ToString());
                 DateTime currTime;
-                FastConsole.Flush();
+                frameBuilder.Clear();
+;               FastConsole.Flush();
                 while (true)
                 {
                     currTime = DateTime.Now;
-                    if ((nextFrameTime - currTime).Milliseconds == 0)
+                    if ((nextFrameTime - currTime).Milliseconds <= 0)
                     {
                         nextFrameTime = currTime.AddMilliseconds((1000 / targetFPS) + 1 + leapMs);  //No clue why the additional ms is needed, but it just works with it and I'm leaving it as is
                         break;
@@ -197,6 +250,7 @@ namespace ConsolePlayerUtil
             {
                 maxItemLength = s.Length > maxItemLength ? s.Length : maxItemLength;
             }
+            padding = "{0,-" + (maxItemLength + 4) + "}" + "{1}";
             while (!userSelected)
             {
                 Console.Clear();
@@ -205,7 +259,6 @@ namespace ConsolePlayerUtil
                 {
                     item = items[i];
                     selectedChar = selection == i ? '■' : ' ';
-                    padding = "{0,-" + (maxItemLength + 4) + "}"+"{1}";
                     Console.Write(padding,"\n" + item, selectedChar);
                 }
                 ConsoleKey inputKey = Console.ReadKey().Key;
